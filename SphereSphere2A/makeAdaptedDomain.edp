@@ -1,0 +1,70 @@
+load "msh3"
+load "tetgen"
+load "medit"
+
+mesh Th=square(10,20,[x*pi-pi/2,2*y*pi]);  //  $]\frac{-pi}{2},frac{-pi}{2}[\times]0,2\pi[ $
+//  a parametrization of a sphere
+func f1 =cos(x)*cos(y);
+func f2 =cos(x)*sin(y);
+func f3 = sin(x);
+//  partial derivative of the parametrization DF
+func f1x=sin(x)*cos(y);
+func f1y=-cos(x)*sin(y);
+func f2x=-sin(x)*sin(y);
+func f2y=cos(x)*cos(y);
+func f3x=cos(x);
+func f3y=0;
+// $  M = DF^t DF $
+func m11=f1x^2+f2x^2+f3x^2;
+func m21=f1x*f1y+f2x*f2y+f3x*f3y;
+func m22=f1y^2+f2y^2+f3y^2;
+
+func perio=[[4,y],[2,y],[1,x],[3,x]];
+real hh=0.1;
+real vv= 1/square(hh);
+verbosity=2;
+Th=adaptmesh(Th,m11*vv,m21*vv,m22*vv,IsMetric=1,periodic=perio);
+Th=adaptmesh(Th,m11*vv,m21*vv,m22*vv,IsMetric=1,periodic=perio);
+
+verbosity=2;
+
+// construction of the surface of spheres
+real Rmax = 4.0;
+real Rmin = 1.0;
+
+meshS ThSmax=movemesh23(Th,transfo=[Rmax*f1,Rmax*f2,Rmax*f3]);
+meshS ThSmin=movemesh23(Th,transfo=[Rmin*f1,Rmin*f2,Rmin*f3]);
+
+meshS Thh = ThSmax + ThSmin;
+
+real[int] domain = [0.,0.,0.,145,0.01];
+real[int] hole = [0.0,0.,0.];
+mesh3 Th3=tetg(Thh,switch="paAAQYY",nbofregions=1,holelist=hole,regionlist=domain);
+
+func newlabel = ( x^2+y^2+z^2 < 1.5 ) ? 10 : 100;
+Th3 = change(Th3, flabel = newlabel);
+
+fespace Vh ( Th3, P1 );
+Vh u, v, usol;
+func f = 0.0;
+
+macro Grad(u) [ dx(u), dy(u), dz(u) ] // EOM
+
+solve Poisson ( u, v, solver = CG ) =
+    int3d ( Th3 ) ( Grad(u)' * Grad(v) )
+  - int3d ( Th3 ) ( f * v )
+  + on(10,u=1) + on(100,u=0);
+
+
+mesh3 Th3sphrefine=tetgreconstruction(Th3,switch="raAQ",sizeofvolume=u);
+
+
+savemesh(Th3sphrefine,"nuova.meshb");
+
+load "iovtk"
+
+/* int[int] Order = [1];
+string DataName = "u";
+savevtk("nuovo.vtu", Th3sphrefine, u, dataname=DataName, order=Order); */
+
+savemesh(Th3,"sphereSadapted.meshb");
