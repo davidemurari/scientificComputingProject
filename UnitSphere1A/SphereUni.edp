@@ -1,0 +1,70 @@
+//Solution of P-laplace via functional minimization by NLCG
+real TargetP = 10.0;
+real r= 1;
+
+// Mesh
+load "msh3"
+load "medit"
+load "iovtk"
+
+mesh3 Th("sphere.meshb");
+
+// Finite element space
+fespace Vh(Th, P1);
+Vh u0,u,v;
+
+int maxrestart = 20;
+int conv = 0;
+real n = 3.0;
+
+func f = 1.0;
+
+macro grad(u) [dx(u),dy(u),dz(u)] //EOM defining the gradient of u
+
+solve Poisson(u0,v) = int3d(Th)(grad(u0)'*grad(v))-int3d(Th)(f*v) + on(0,1,u0=0);
+u = u0;
+
+for (real p=2.0;p<=TargetP;p=p+1){
+
+
+    func uexact = ((p-1)/p)*n^(1/(1-p))*(1-(x^2+y^2+z^2)^(p/(2*p-2)));
+
+    func real[int] dJ (real[int] & u){
+            Vh w;
+            w[] = u;
+            varf au(uh,vh) = int3d(Th)((grad(w)'*grad(w))^((p-2)/2)*(grad(w)'*grad(vh))-f*vh);
+            u = au(0, Vh);
+            return u;
+    }
+
+    fespace Ph(Th,P0);
+    Ph normGrad;
+    normGrad = grad(u)'*grad(u);
+
+    varf delta2tildeJR(w,v) = int3d(Th)(normGrad^((p-2)/2)*(grad(w)'*grad(v)))
+                              + on(0,1,w=0);
+
+    matrix P = delta2tildeJR(Vh,Vh,solver=Cholesky,factorize=1);
+
+    func real[int] C(real[int] & vec)
+    {
+      real[int] r = P^(-1)*vec;
+      return r;
+    }
+
+    for (int i=0;i<maxrestart;i++){
+      conv = NLCG(dJ,precon=C,u[], nbiter=20,eps=-1e-10);
+      if (conv) break;
+      normGrad = grad(u)'*grad(u);
+      P = delta2tildeJR(Vh,Vh, solver=Cholesky, factorize=1);
+    }
+    cout<<"Numero p: "<<endl<<p<<endl;
+    cout<<"Norma errore:"<<endl<<sqrt(int3d(Th)(u-uexact)^2)<<endl;
+
+    // The following 5 lines are used for the visualization in the report
+    /* if (p==4.0 || p==20.0 || p==50.0 || p==70.0){
+        string s = "presentP"+p+".vtu";
+        int[int] Order = [1];
+        string DataName = "u";
+        savevtk(s, Th, u, dataname=DataName, order=Order); } */
+}
