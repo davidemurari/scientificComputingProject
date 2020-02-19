@@ -1,0 +1,66 @@
+//Solution of P-laplace via functional minimization by NLCG
+real TargetP = 5.0;
+real r= 1;
+
+// Mesh
+load "msh3"
+load "medit"
+load "iovtk"
+
+mesh3 Th("torosfera.meshb");
+
+
+// Finite element space
+fespace Vh(Th, P1);
+Vh u0,u,v;
+
+int maxrestart = 20;
+int conv = 0;
+int n = 3;
+
+real p = 3.0;
+
+func f = 1.0;
+
+macro grad(u) [dx(u),dy(u),dz(u)] //EOM defining the gradient of u
+
+solve Poisson(u,v) = int3d(Th)(grad(u)'*grad(v))-int3d(Th)(f*v) + on(10,100,u=0);
+
+while (p<=TargetP) {
+
+    func real[int] dJ (real[int] & ucc){
+            Vh w;
+            w[] = ucc;
+            varf au(uh,vh) = int3d(Th)((grad(w)'*grad(w))^((p-2)/2)*(grad(w)'*grad(vh))-f*vh);
+            real[int] r = au(0,Vh);
+            return r;
+    }
+
+    fespace Ph(Th,P0);
+    Ph normGrad;
+    normGrad = grad(u)'*grad(u);
+
+    varf delta2tildeJR(w,v) = int3d(Th)(normGrad^((p-2)/2)*(grad(w)'*grad(v)))
+                              + on(10,100,w=0);
+
+    matrix P = delta2tildeJR(Vh,Vh,solver=Cholesky,factorize=1);
+
+    func real[int] C(real[int] & vec)
+    {
+      real[int] r = P^(-1)*vec;
+      return r;
+    }
+
+    for (int i=0;i<maxrestart;i++){
+      conv = NLCG(dJ,precon=C,u[], nbiter=20,eps=-1e-10);
+      if (conv) break;
+      normGrad = grad(u)'*grad(u);
+      P = delta2tildeJR(Vh,Vh, solver=Cholesky, factorize=1);
+    }
+    p = p + 1;
+
+    string s = "caseP"+p+".vtu";
+    int[int] Order = [1];
+    string DataName = "u";
+    savevtk(s, Th, u, dataname=DataName, order=Order);
+}

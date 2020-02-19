@@ -1,0 +1,70 @@
+load "medit"
+load "msh3"
+load "tetgen"
+load "iovtk"
+
+
+// 2D mesh
+mesh Th = square(10, 20, [x*pi-pi/2, 2*y*pi]); // ]-pi/2, pi/2[X]0,2pi[
+
+// 3D mesh
+//parametrization of a sphere
+func f1 = cos(x)*cos(y);
+func f2 = cos(x)*sin(y);
+func f3 = sin(x);
+//partial derivative of the parametrization
+func f1x = sin(x)*cos(y);
+func f1y = -cos(x)*sin(y);
+func f2x = -sin(x)*sin(y);
+func f2y = cos(x)*cos(y);
+func f3x = cos(x);
+func f3y = 0;
+//M = DF^t DF
+func m11 = f1x^2 + f2x^2 + f3x^2;
+func m21 = f1x*f1y + f2x*f2y + f3x*f3y;
+func m22 = f1y^2 + f2y^2 + f3y^2;
+
+func perio = [[4, y], [2, y], [1, x], [3, x]];
+real hh = 0.1;
+real vv = 1/square(hh);
+verbosity = 2;
+Th = adaptmesh(Th, m11*vv, m21*vv, m22*vv, IsMetric=1, periodic=perio);
+Th = adaptmesh(Th, m11*vv, m21*vv, m22*vv, IsMetric=1, periodic=perio);
+plot(Th, wait=true);
+
+mesh TTh=square(40,40,[2*x*pi,2*y*pi]);
+real RR = 0.6;
+real rr = 0.2;
+func XX1 =(RR+rr*cos(x))*cos(y);
+func XX2 =(RR+rr*cos(x))*sin(y);
+func XX3 = rr*sin(x);
+
+
+int[int] ref31h = [0, 12];
+int[int] ref31b = [0, 11];
+meshS Toro = movemesh23(TTh,transfo=[XX1,XX2,XX3],orientation = 1,label=ref31h);
+
+
+
+real Rmax = 2.;
+func f1max = Rmax*f1;
+func f2max = Rmax*f2;
+func f3max = Rmax*f3;
+
+meshS ThSsph2 = movemesh23(Th, transfo=[f1max, f2max, f3max],label= ref31b);
+
+//gluing meshes
+meshS ThS = Toro + ThSsph2;
+
+
+cout << " TetGen call with hole " << endl;
+real[int] hole = [0.4,0.,0.];
+real[int] domain = [1.5, 0., 0., 53, 0.001];
+mesh3 Th3finhole = tetg(ThS, switch="paAAQYY",
+    nbofholes=1, holelist=hole, nbofregions=1, regionlist=domain);
+medit("Sphere with a hole", Th3finhole);
+
+func newlabel = ( x^2+y^2+z^2 < 1 ) ? 10 : 100;
+Th3finhole = change(Th3finhole, flabel= newlabel);
+
+savemesh(Th3finhole,"torosfera.meshb");
