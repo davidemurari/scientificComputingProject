@@ -24,7 +24,7 @@ func f = 0.0;
 
 macro grad(u) [dx(u),dy(u),dz(u)] //EOM defining the gradient of u
 
-func uexact = (x^2+y^2+z^2)^(-(n-p)/(p-1));
+func uexact = (sqrt(x^2+y^2+z^2))^(-(n-p)/(p-1));
 real R = 4.0;
 real VAL = uexact(R,0,0);
 
@@ -62,7 +62,7 @@ for (int i=0;i<maxrestart;i++){
   P = delta2tildeJR(Vh,Vh, solver=Cholesky, factorize=1);
 }
 cout<<"Numero p: "<<endl<<p<<endl;
-cout<<"Errore mediato:"<<endl<<(sqrt(int3d(Th)((u-uexact)^2)))/(4/3*pi*(R^3-1))<<endl; //Here the L2 error is averaged over the whole volume of the domain
+cout<<"Errore:"<<endl<<(sqrt(int3d(Th)((u-uexact)^2)))<<endl; //Here the L2 error
 
 string s = "caseP"+p+".vtu";
 int[int] Order = [1];
